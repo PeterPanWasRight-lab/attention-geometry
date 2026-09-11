@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Attention Geometry Lab</title>
+<meta name="description" content="Interactive geometric visualizations for single-head and multi-head attention.">
+<style>
+:root{
+  --bg:#f6f7fb; --card:#ffffff; --text:#20242b; --muted:#667085;
+  --border:#d9dee8; --accent:#315efb; --accentSoft:#edf2ff;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+}
+header{
+  max-width:1180px;margin:0 auto;padding:42px 20px 24px;
+}
+h1{font-size:38px;line-height:1.15;margin:0 0 10px}
+.subtitle{color:var(--muted);font-size:16px;max-width:850px;line-height:1.7}
+.badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.badge{padding:6px 10px;border-radius:999px;background:var(--accentSoft);border:1px solid #cfd8ff;font-size:13px}
+main{max-width:1180px;margin:0 auto;padding:0 20px 48px}
+.tabs{
+  display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 16px;
+  position:sticky;top:0;background:rgba(246,247,251,.94);backdrop-filter:blur(8px);
+  padding:12px 0;z-index:5;
+}
+button,a.btn{
+  border:1px solid var(--border);background:#fff;color:var(--text);
+  padding:10px 14px;border-radius:10px;font:inherit;cursor:pointer;text-decoration:none;
+}
+button.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.panel{
+  background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;
+  box-shadow:0 2px 12px rgba(0,0,0,.035);
+}
+.panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.panel-head h2{margin:0;font-size:22px}
+.panel-head p{margin:4px 0 0;color:var(--muted);font-size:14px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+iframe{
+  width:100%;height:78vh;min-height:720px;border:1px solid var(--border);border-radius:10px;background:white;
+}
+.hidden{display:none}
+.about{
+  display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px
+}
+.about>div{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px}
+.about h3{margin:0 0 8px;font-size:16px}
+.about p{margin:0;color:var(--muted);line-height:1.65;font-size:14px}
+footer{max-width:1180px;margin:0 auto;padding:0 20px 34px;color:var(--muted);font-size:13px}
+@media(max-width:760px){
+  h1{font-size:30px}
+  iframe{min-height:620px;height:75vh}
+  .about{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Attention Geometry Lab</h1>
+  <div class="subtitle">
+    用三维向量、注意力矩阵和向量加权叠加来直观理解
+    <b>Single-Head Attention</b> 与 <b>Multi-Head Attention</b>。
+    两个页面均为纯 HTML/JavaScript，可直接交互。
+  </div>
+  <div class="badges">
+    <span class="badge">3D Vector Geometry</span>
+    <span class="badge">Q / K / V</span>
+    <span class="badge">Scaled Dot-Product Attention</span>
+    <span class="badge">Causal Mask</span>
+    <span class="badge">Multi-Head + W<sub>O</sub></span>
+  </div>
+</header>
+
+<main>
+  <div class="tabs">
+    <button id="tabSingle" class="active" type="button">单头注意力</button>
+    <button id="tabMulti" type="button">多头注意力</button>
+  </div>
+
+  <section id="singlePanel" class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Single-Head Attention</h2>
+        <p>重点：Q/K 几何关系、注意力矩阵、V 的加权求和与部分和轨迹。</p>
+      </div>
+      <div class="actions">
+        <a class="btn primary" href="single-head.html" target="_blank" rel="noopener">新标签页打开</a>
+      </div>
+    </div>
+    <iframe src="single-head.html" title="Single-head attention visualization"></iframe>
+  </section>
+
+  <section id="multiPanel" class="panel hidden">
+    <div class="panel-head">
+      <div>
+        <h2>Multi-Head Attention</h2>
+        <p>重点：不同 Head 的独立投影空间、两套注意力矩阵、Concat 与 W<sub>O</sub> 融合。</p>
+      </div>
+      <div class="actions">
+        <a class="btn primary" href="multi-head.html" target="_blank" rel="noopener">新标签页打开</a>
+      </div>
+    </div>
+    <iframe data-src="multi-head.html" title="Multi-head attention visualization"></iframe>
+  </section>
+
+  <section class="about">
+    <div>
+      <h3>单头页面在讲什么</h3>
+      <p>
+        每个 token 是三维向量。你可以修改 W<sub>Q</sub>、W<sub>K</sub>、W<sub>V</sub>，
+        观察 X 如何映射到 Q/K/V 空间，并直接查看
+        A = softmax(QK<sup>T</sup>/√d) 与 O = AV 的几何意义。
+      </p>
+    </div>
+    <div>
+      <h3>多头页面在讲什么</h3>
+      <p>
+        同一组 X 分别进入 Head 1 和 Head 2。每个 Head 形成自己的 Q/K/V 与注意力矩阵，
+        然后将 O<sup>(1)</sup>、O<sup>(2)</sup> 拼接并经过 W<sub>O</sub> 得到最终输出。
+      </p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Static educational demo for GitHub Pages. No external JavaScript dependency required.
+</footer>
+
+<script>
+(() => {
+  const singleBtn = document.getElementById("tabSingle");
+  const multiBtn = document.getElementById("tabMulti");
+  const single = document.getElementById("singlePanel");
+  const multi = document.getElementById("multiPanel");
+  const multiFrame = multi.querySelector("iframe");
+
+  function show(which){
+    const isSingle = which === "single";
+    single.classList.toggle("hidden", !isSingle);
+    multi.classList.toggle("hidden", isSingle);
+    singleBtn.classList.toggle("active", isSingle);
+    multiBtn.classList.toggle("active", !isSingle);
+    if(!isSingle && !multiFrame.src){
+      multiFrame.src = multiFrame.dataset.src;
+    }
+    history.replaceState(null, "", isSingle ? "#single-head" : "#multi-head");
+  }
+
+  singleBtn.addEventListener("click", () => show("single"));
+  multiBtn.addEventListener("click", () => show("multi"));
+
+  if(location.hash === "#multi-head") show("multi");
+})();
+</script>
+</body>
+</html>

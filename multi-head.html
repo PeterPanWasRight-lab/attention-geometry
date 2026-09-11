@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Multi-Head Attention 几何教学网页</title>
+<style>
+:root{
+  --bg:#f6f7f9; --card:#fff; --text:#20242b; --muted:#667085; --border:#d9dee8;
+  --accent:#315efb; --soft:#eef2ff; --warn:#fff8e8;
+  --blue:#315efb; --green:#18a66a; --orange:#e58629; --purple:#8a5bd0; --red:#d64545;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:18px;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+h1{font-size:28px;margin:0 0 6px} h2{font-size:20px;margin:0 0 10px} h3{font-size:16px;margin:0 0 8px}
+p{margin:6px 0}.muted{color:var(--muted);font-size:13px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0 12px}
+button,select,input{font:inherit}
+button,select{border:1px solid var(--border);background:#fff;padding:7px 10px;border-radius:8px}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+input[type=number]{width:66px;padding:6px;border:1px solid var(--border);border-radius:7px}
+input[type=range]{width:160px}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(210px,1fr));gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.block{border:1px solid var(--border);border-radius:10px;padding:10px;background:#fbfcfe}
+.tokens .row{display:grid;grid-template-columns:36px repeat(3,66px);gap:5px;margin:5px 0;align-items:center}
+.matrix3{display:grid;grid-template-columns:repeat(3,66px);gap:5px}
+.canvas-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px}
+canvas{width:100%;height:320px;border:1px solid var(--border);border-radius:10px;background:#fff;display:block}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border:1px solid var(--border);padding:7px;text-align:center}
+th{background:#f3f5f8}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.eq{background:#fafbfc;border:1px solid var(--border);border-radius:9px;padding:10px;font-size:13px;line-height:1.6}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:8px}
+.sw{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:middle;margin-right:5px}
+.badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#eef2ff;border:1px solid #cfd8ff;font-size:12px}
+.status{font-size:13px;margin-left:auto;color:var(--muted)}
+.status.ok{color:#16794b}.status.bad{color:#b42318}
+.prebox{white-space:pre-wrap;background:#fafbfc;border:1px solid var(--border);border-radius:10px;padding:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+.barbox{border:1px solid var(--border);border-radius:10px;padding:10px;background:#fff}
+.barrow{display:grid;grid-template-columns:50px minmax(140px,1fr) 80px;gap:6px;align-items:center;margin:8px 0}
+.bar{height:16px;border-radius:5px;background:#dbe5ff;position:relative;overflow:hidden;border:1px solid #c7d3f6}
+.bar .fill{position:absolute;top:0;bottom:0;left:50%;background:#315efb}
+.bar.red .fill{background:#d64545}
+.small{font-size:12px}
+.note{background:#fff8e8;border:1px solid #ead59a;border-radius:9px;padding:10px;font-size:13px}
+.sum-box{background:#fafbfc;border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+.sum-box .line{margin:4px 0}
+@media(max-width:1100px){.grid4,.grid3,.grid2{grid-template-columns:1fr}}
+@media(max-width:640px){.tokens .row{grid-template-columns:30px repeat(3,minmax(0,1fr))}.tokens input,.matrix3 input{width:100%}.matrix3{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+<h1>Multi-Head Attention 几何教学网页</h1>
+<p class="muted">目标：在保留单头直觉的基础上，进一步理解“两头注意力”为什么比单头表达更丰富。整个网页自包含，无外部依赖。</p>
+
+<div class="card">
+  <h2>1. 总体结构</h2>
+  <div class="prebox">                 X [4×3]
+                   │
+        ┌──────────┴──────────┐
+        │                     │
+      Head 1                Head 2
+        │                     │
+   Q1 K1 V1              Q2 K2 V2
+        │                     │
+       A1                    A2
+        │                     │
+     O1=A1V1              O2=A2V2
+      [4×3]                [4×3]
+        │                     │
+        └──────────┬──────────┘
+                   │
+              Concatenate
+                 [4×6]
+                   │
+              W_O [6×3]
+                   │
+                   ▼
+                Y [4×3]</div>
+  <div class="eq" style="margin-top:10px">
+    <div><b>教学设定</b></div>
+    <div>每个 head 都把同一个 <span class="mono">X ∈ R<sup>4×3</sup></span> 映射到自己的 3D Q/K/V 空间中，因此每个 head 仍然可以用 3D 向量几何来观察。</div>
+    <div style="margin-top:6px"><b>核心公式</b></div>
+    <div class="mono">Q<sup>(h)</sup> = XW<sub>Q</sub><sup>(h)</sup>, K<sup>(h)</sup> = XW<sub>K</sub><sup>(h)</sup>, V<sup>(h)</sup> = XW<sub>V</sub><sup>(h)</sup></div>
+    <div class="mono">A<sup>(h)</sup> = row-softmax(Q<sup>(h)</sup>K<sup>(h)T</sup>/√3 + M)</div>
+    <div class="mono">O<sup>(h)</sup> = A<sup>(h)</sup>V<sup>(h)</sup></div>
+    <div class="mono">O<sub>cat</sub> = [O<sup>(1)</sup>, O<sup>(2)</sup>] ∈ R<sup>4×6</sup></div>
+    <div class="mono">Y = O<sub>cat</sub>W<sub>O</sub> ∈ R<sup>4×3</sup></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>2. 输入与参数</h2>
+  <div class="toolbar">
+    <label>预设
+      <select id="preset">
+        <option value="same">两个 Head 完全一样</option>
+        <option value="different" selected>两个 Head 看不同方向</option>
+        <option value="mixed">两个 Head 都是混合变换</option>
+      </select>
+    </label>
+    <button id="apply">应用预设</button>
+    <button id="reset">恢复默认</button>
+    <label><input id="causal" type="checkbox" checked> causal mask</label>
+    <button id="update" class="primary">更新</button>
+    <span id="status" class="status">尚未计算</span>
+  </div>
+
+  <div class="grid4">
+    <div class="block tokens">
+      <h3>输入 token：X ∈ R<sup>4×3</sup></h3>
+      <div id="tokens"></div>
+    </div>
+    <div class="block">
+      <h3>W<sub>Q</sub><sup>(1)</sup></h3><div id="WQ1" class="matrix3"></div>
+      <h3 style="margin-top:10px">W<sub>K</sub><sup>(1)</sup></h3><div id="WK1" class="matrix3"></div>
+      <h3 style="margin-top:10px">W<sub>V</sub><sup>(1)</sup></h3><div id="WV1" class="matrix3"></div>
+    </div>
+    <div class="block">
+      <h3>W<sub>Q</sub><sup>(2)</sup></h3><div id="WQ2" class="matrix3"></div>
+      <h3 style="margin-top:10px">W<sub>K</sub><sup>(2)</sup></h3><div id="WK2" class="matrix3"></div>
+      <h3 style="margin-top:10px">W<sub>V</sub><sup>(2)</sup></h3><div id="WV2" class="matrix3"></div>
+    </div>
+    <div class="block">
+      <h3>W<sub>O</sub> ∈ R<sup>6×3</sup></h3><div id="WO" class="matrix3"></div>
+      <div class="muted" style="margin-top:8px">默认让两个 head 先“平均融合”，便于教学理解。</div>
+    </div>
+  </div>
+  <div class="toolbar">
+    <label>主图区方位角 <input id="az" type="range" min="-180" max="180" value="-35"> <span id="azv">-35°</span></label>
+    <label>主图区仰角 <input id="el" type="range" min="-80" max="80" value="25"> <span id="elv">25°</span></label>
+  </div>
+</div>
+
+<div class="card">
+  <h2>3. Head 1 与 Head 2 的几何空间对比</h2>
+  <div class="grid3">
+    <div class="canvas-card"><h3>Head 1：Q<sup>(1)</sup></h3><canvas id="plotQ1"></canvas></div>
+    <div class="canvas-card"><h3>Head 1：K<sup>(1)</sup></h3><canvas id="plotK1"></canvas></div>
+    <div class="canvas-card"><h3>Head 1：V<sup>(1)</sup></h3><canvas id="plotV1"></canvas></div>
+    <div class="canvas-card"><h3>Head 2：Q<sup>(2)</sup></h3><canvas id="plotQ2"></canvas></div>
+    <div class="canvas-card"><h3>Head 2：K<sup>(2)</sup></h3><canvas id="plotK2"></canvas></div>
+    <div class="canvas-card"><h3>Head 2：V<sup>(2)</sup></h3><canvas id="plotV2"></canvas></div>
+  </div>
+  <div class="legend">
+    <span><span class="sw" style="background:#315efb"></span>token 0</span>
+    <span><span class="sw" style="background:#18a66a"></span>token 1</span>
+    <span><span class="sw" style="background:#e58629"></span>token 2</span>
+    <span><span class="sw" style="background:#8a5bd0"></span>token 3</span>
+  </div>
+</div>
+
+<div class="card">
+  <h2>4. 两个 Attention Matrix 的对比</h2>
+  <div class="grid2">
+    <div><table id="A1"></table><div style="height:10px"></div><table id="S1"></table></div>
+    <div><table id="A2"></table><div style="height:10px"></div><table id="S2"></table></div>
+  </div>
+  <div class="toolbar">
+    <label>比较哪一行 query
+      <select id="qcmp"><option value="0">q0</option><option value="1">q1</option><option value="2">q2</option><option value="3" selected>q3</option></select>
+    </label>
+    <span class="badge" id="cmpBadge">比较 q3 对所有 key 的注意力分配</span>
+  </div>
+  <div class="grid2">
+    <div class="barbox"><h3>Head 1：A<sup>(1)</sup> 的第 i 行</h3><div id="barsA1"></div></div>
+    <div class="barbox"><h3>Head 2：A<sup>(2)</sup> 的第 i 行</h3><div id="barsA2"></div></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>5. 单个 Head 的 AV 向量叠加（可切换 Head）</h2>
+  <div class="toolbar">
+    <label>查看哪一个 head
+      <select id="headView"><option value="1" selected>Head 1</option><option value="2">Head 2</option></select>
+    </label>
+    <label>查看哪一行 query
+      <select id="qrow"><option value="0">i = 0</option><option value="1">i = 1</option><option value="2">i = 2</option><option value="3" selected>i = 3</option></select>
+    </label>
+    <span class="badge" id="sumLabel">Head 1, o₃ = Σⱼ a₃ⱼ vⱼ</span>
+  </div>
+  <div class="toolbar">
+    <label>本节方位角 <input id="avAz" type="range" min="-180" max="180" value="-35"> <span id="avAzv">-35°</span></label>
+    <label>本节仰角 <input id="avEl" type="range" min="-80" max="80" value="25"> <span id="avElv">25°</span></label>
+  </div>
+  <div class="grid2">
+    <div class="canvas-card"><h3>缩放后的分量向量 a<sub>ij</sub>v<sub>j</sub></h3><canvas id="plotScaledV"></canvas></div>
+    <div class="canvas-card"><h3>首尾相接的叠加过程</h3><canvas id="plotChain"></canvas><div class="sum-box mono" style="margin-top:10px" id="partialSums"></div></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>6. 多头输出如何合并</h2>
+  <div class="grid2">
+    <div class="canvas-card"><h3>Head 1 输出：O<sup>(1)</sup></h3><canvas id="plotO1"></canvas></div>
+    <div class="canvas-card"><h3>Head 2 输出：O<sup>(2)</sup></h3><canvas id="plotO2"></canvas></div>
+  </div>
+  <div class="grid2" style="margin-top:14px">
+    <div class="barbox">
+      <h3>Concatenate 后的 6 维向量：O<sub>cat</sub></h3>
+      <div class="toolbar">
+        <label>查看 token
+          <select id="tokenMerge"><option value="0">token 0</option><option value="1">token 1</option><option value="2">token 2</option><option value="3" selected>token 3</option></select>
+        </label>
+      </div>
+      <div id="ocatBars"></div>
+    </div>
+    <div class="canvas-card">
+      <h3>经过 W<sub>O</sub> 后的最终输出：Y = O<sub>cat</sub>W<sub>O</sub></h3>
+      <canvas id="plotY"></canvas>
+      <div class="note" style="margin-top:10px">每个 head 内部的 O<sup>(h)</sup> = A<sup>(h)</sup>V<sup>(h)</sup> 是凸组合；但经过 W<sub>O</sub> 之后，最终 Y 是一般线性混合，不再要求落在任一 head 的凸包中。</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>7. 一页结论</h2>
+  <div class="eq">
+    <div><b>单头：</b> 一个投影空间里形成一套关系矩阵，然后做一次 V 的加权融合。</div>
+    <div><b>多头：</b> 多个不同投影空间里，各自形成一套关系矩阵；每个 head 读出自己擅长的上下文，再在输出端融合。</div>
+    <div><b>最核心的一句话：</b></div>
+    <div class="mono">一个 head = 一个独立的关系观察角度</div>
+    <div class="mono">multi-head = 在多个不同投影空间里，同时建立多套 token 关系，再融合</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(() => {
+  const COLORS = ["#315efb","#18a66a","#e58629","#8a5bd0"];
+  const RED = "#d64545";
+  const DEFAULT_X = [[1,0.2,0.1],[0.8,1,0.2],[0.2,0.9,1],[0.1,0.2,1.1]];
+  const PRESETS = {
+    same: {
+      WQ1:[[1,0,0],[0,1,0],[0,0,1]], WK1:[[1,0,0],[0,1,0],[0,0,1]], WV1:[[1,0,0],[0,1,0],[0,0,1]],
+      WQ2:[[1,0,0],[0,1,0],[0,0,1]], WK2:[[1,0,0],[0,1,0],[0,0,1]], WV2:[[1,0,0],[0,1,0],[0,0,1]],
+      WO:[[0.5,0,0],[0,0.5,0],[0,0,0.5],[0.5,0,0],[0,0.5,0],[0,0,0.5]]
+    },
+    different: {
+      WQ1:[[1.4,0,0],[0,1,0],[0,0,0.2]], WK1:[[1.3,0.1,0],[0.1,1,0],[0,0,0.25]], WV1:[[1,0.2,0],[0,1,0.1],[0,0,0.8]],
+      WQ2:[[0.2,0,0],[0,1,0],[0,0,1.4]], WK2:[[0.25,0,0],[0,1,0.1],[0,0.1,1.3]], WV2:[[0.8,0,0.1],[0.2,1,0],[0.1,0.2,1]],
+      WO:[[0.5,0,0],[0,0.5,0],[0,0,0.5],[0.5,0,0],[0,0.5,0],[0,0,0.5]]
+    },
+    mixed: {
+      WQ1:[[1,0.6,0.2],[0.2,1.1,0.3],[0.1,0.5,0.9]], WK1:[[1.2,-0.2,0.4],[0.1,1,0.5],[0.3,0.2,0.8]], WV1:[[0.8,0.4,0.2],[0.3,1.1,0.2],[0.5,0.1,1]],
+      WQ2:[[0.9,-0.3,0.4],[0.3,1.0,0.2],[0.2,0.4,1.1]], WK2:[[1.1,0.2,-0.2],[-0.1,0.9,0.5],[0.4,0.3,0.7]], WV2:[[0.7,0.1,0.3],[0.2,1.2,0.2],[0.4,0.2,0.9]],
+      WO:[[0.6,0.1,0],[0.1,0.6,0],[0,0.1,0.6],[0.4,-0.1,0.1],[-0.1,0.4,0.1],[0.1,0.1,0.4]]
+    }
+  };
+  const $ = id => document.getElementById(id);
+  let STATE = null;
+
+  function makeInput(id,val){
+    const e=document.createElement("input"); e.type="number"; e.step="0.1"; e.id=id; e.value=val; return e;
+  }
+  function buildInputs(){
+    $("tokens").innerHTML="";
+    DEFAULT_X.forEach((r,i)=>{
+      const row=document.createElement("div"); row.className="row";
+      const b=document.createElement("b"); b.textContent="x"+i; row.appendChild(b);
+      r.forEach((v,j)=>row.appendChild(makeInput(`x_${i}_${j}`,v)));
+      $("tokens").appendChild(row);
+    });
+    ["WQ1","WK1","WV1","WQ2","WK2","WV2"].forEach(id=>{
+      $(id).innerHTML="";
+      for(let i=0;i<3;i++) for(let j=0;j<3;j++) $(id).appendChild(makeInput(`${id}_${i}_${j}`,0));
+    });
+    $("WO").innerHTML="";
+    for(let i=0;i<6;i++) for(let j=0;j<3;j++) $("WO").appendChild(makeInput(`WO_${i}_${j}`,0));
+  }
+  function writeMatrix(name,M){ for(let i=0;i<M.length;i++) for(let j=0;j<M[0].length;j++) $(`${name}_${i}_${j}`).value=M[i][j]; }
+  function applyPreset(){ const p=PRESETS[$("preset").value]; Object.keys(p).forEach(k=>writeMatrix(k,p[k])); update(); }
+  function reset(){ DEFAULT_X.forEach((r,i)=>r.forEach((v,j)=>$(`x_${i}_${j}`).value=v)); $("preset").value="different"; applyPreset(); }
+  function val(id){ const e=$(id), v=Number(e.value); if(!Number.isFinite(v) || Math.abs(v)>1e6){ e.style.borderColor="#d64545"; throw new Error(`${id} 输入无效`);} e.style.borderColor=""; return v; }
+  function readX(){ return Array.from({length:4},(_,i)=>Array.from({length:3},(_,j)=>val(`x_${i}_${j}`))); }
+  function readMat(name,r,c){ return Array.from({length:r},(_,i)=>Array.from({length:c},(_,j)=>val(`${name}_${i}_${j}`))); }
+  function mul(A,B){ const m=A.length,n=A[0].length,p=B[0].length; return Array.from({length:m},(_,i)=>Array.from({length:p},(_,j)=>{ let s=0; for(let k=0;k<n;k++) s+=A[i][k]*B[k][j]; return s; })); }
+  function dot(a,b){ let s=0; for(let i=0;i<a.length;i++) s+=a[i]*b[i]; return s; }
+  function softmax(row){ const finite=row.filter(Number.isFinite); if(!finite.length) throw new Error("softmax 行无有限值"); const m=Math.max(...finite); const ex=row.map(v=>Number.isFinite(v)?Math.exp(v-m):0); const s=ex.reduce((a,b)=>a+b,0); return ex.map(v=>v/s); }
+  function scores(Q,K,causal){ return Q.map((q,i)=>K.map((k,j)=>causal&&j>i?-Infinity:dot(q,k)/Math.sqrt(3))); }
+  function weighted(A,V){ return A.map(a=>Array.from({length:V[0].length},(_,k)=>a.reduce((s,w,j)=>s+w*V[j][k],0))); }
+  function concatCols(A,B){ return A.map((r,i)=>r.concat(B[i])); }
+  function fmt(x){ return Number.isFinite(x)?x.toFixed(3):"−∞"; }
+  function vecAdd(a,b){ return a.map((x,i)=>x+b[i]); }
+  function vecScale(a,v){ return v.map(x=>a*x); }
+  function flatAbs(x){ return x.flat(Infinity).map(v=>Math.abs(v)); }
+
+  function project(p, azDeg, elDeg){
+    const az=azDeg*Math.PI/180, el=elDeg*Math.PI/180;
+    const x1=Math.cos(az)*p[0]-Math.sin(az)*p[1];
+    const y1=Math.sin(az)*p[0]+Math.cos(az)*p[1];
+    const z1=p[2];
+    const x2=x1;
+    const y2=Math.cos(el)*y1-Math.sin(el)*z1;
+    const z2=Math.sin(el)*y1+Math.cos(el)*z1;
+    return [x2, -z2, y2];
+  }
+  function prepCanvas(canvas){
+    const dpr=Math.max(1,window.devicePixelRatio||1), rect=canvas.getBoundingClientRect();
+    const w=Math.max(280,Math.floor(rect.width)), h=320;
+    canvas.width=Math.floor(w*dpr); canvas.height=Math.floor(h*dpr); canvas.style.height=h+"px";
+    const ctx=canvas.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); return {ctx,w,h};
+  }
+  function arrow(ctx,x0,y0,x1,y1,color,width=2.4,dashed=false){
+    ctx.save(); ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=width; if(dashed) ctx.setLineDash([6,4]);
+    ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke(); ctx.setLineDash([]);
+    const ang=Math.atan2(y1-y0,x1-x0), len=8; ctx.beginPath(); ctx.moveTo(x1,y1);
+    ctx.lineTo(x1-len*Math.cos(ang-.45),y1-len*Math.sin(ang-.45)); ctx.lineTo(x1-len*Math.cos(ang+.45),y1-len*Math.sin(ang+.45)); ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  function drawPoint(ctx,x,y,label,color="#444"){ ctx.fillStyle=color; ctx.beginPath(); ctx.arc(x,y,2.7,0,Math.PI*2); ctx.fill(); ctx.font="bold 12px sans-serif"; ctx.fillText(label,x+5,y-5); }
+  function draw3D(canvas, groups, range, azDeg, elDeg){
+    const {ctx,w,h}=prepCanvas(canvas); ctx.clearRect(0,0,w,h); const origin=[w/2,h/2+8]; const scale=Math.min(w,h)*0.34/range;
+    const conv=p=>{ const q=project(p,azDeg,elDeg); return [origin[0]+q[0]*scale, origin[1]+q[1]*scale]; };
+    const axes=[[[range,0,0],"x","#8d96a5"],[[0,range,0],"y","#8d96a5"],[[0,0,range],"z","#8d96a5"]];
+    axes.forEach(([p,l,c])=>{ const a=conv(p); arrow(ctx,origin[0],origin[1],a[0],a[1],c,1.1); ctx.fillStyle=c; ctx.font="12px sans-serif"; ctx.fillText(l,a[0]+4,a[1]-4); });
+    drawPoint(ctx,origin[0],origin[1],"O","#222");
+    groups.forEach(g=>g.points.forEach((p,i)=>{ const a=conv(p), c=g.colors?g.colors[i]:g.color; arrow(ctx,origin[0],origin[1],a[0],a[1],c,g.width||2.6,g.dashed||false); ctx.fillStyle=c; ctx.font="bold 13px sans-serif"; ctx.fillText(g.prefix+i,a[0]+5,a[1]-5); }));
+  }
+  function drawChain(canvas,vectors,resultVec,azDeg,elDeg){
+    const {ctx,w,h}=prepCanvas(canvas); ctx.clearRect(0,0,w,h);
+    const pts=[[0,0,0]]; let cur=[0,0,0]; for(const v of vectors){ cur=vecAdd(cur,v); pts.push(cur); }
+    const range=Math.max(1,...flatAbs([pts,resultVec]))*1.2, origin=[w/2,h/2+8], scale=Math.min(w,h)*0.34/range;
+    const conv=p=>{ const q=project(p,azDeg,elDeg); return [origin[0]+q[0]*scale, origin[1]+q[1]*scale]; };
+    const axes=[[[range,0,0],"x","#8d96a5"],[[0,range,0],"y","#8d96a5"],[[0,0,range],"z","#8d96a5"]];
+    axes.forEach(([p,l,c])=>{ const a=conv(p); arrow(ctx,origin[0],origin[1],a[0],a[1],c,1.1); ctx.fillStyle=c; ctx.font="12px sans-serif"; ctx.fillText(l,a[0]+4,a[1]-4); });
+    drawPoint(ctx,origin[0],origin[1],"s0","#222");
+    const end=conv(resultVec); arrow(ctx,origin[0],origin[1],end[0],end[1],RED,2.0,true); ctx.fillStyle=RED; ctx.font="bold 13px sans-serif"; ctx.fillText("o",end[0]+5,end[1]-6);
+    for(let i=0;i<vectors.length;i++){ const p0=conv(pts[i]), p1=conv(pts[i+1]); arrow(ctx,p0[0],p0[1],p1[0],p1[1],COLORS[i],3.0,false); drawPoint(ctx,p1[0],p1[1],`s${i+1}`,"#444"); const mx=(p0[0]+p1[0])/2,my=(p0[1]+p1[1])/2; ctx.fillStyle=COLORS[i]; ctx.font="bold 12px sans-serif"; ctx.fillText(`a·v${i}`,mx+4,my-4); }
+  }
+  function heatTable(el,title,M,rp,cp){
+    const finite=M.flat().filter(Number.isFinite), mn=Math.min(...finite), mx=Math.max(...finite);
+    const color=v=>{ if(!Number.isFinite(v)) return "#eee"; const t=mx===mn?0.5:(v-mn)/(mx-mn); return `hsl(215 80% ${96-34*t}%)`; };
+    let s=`<tr><th colspan="${M[0].length+1}">${title}</th></tr><tr><th></th>`; for(let j=0;j<M[0].length;j++) s+=`<th>${cp}${j}</th>`; s+="</tr>";
+    M.forEach((r,i)=>{ s+=`<tr><th>${rp}${i}</th>`; r.forEach(v=>s+=`<td class="mono" style="background:${color(v)}">${fmt(v)}</td>`); s+="</tr>"; });
+    el.innerHTML=s;
+  }
+  function barRows(el, weights){
+    let s=""; weights.forEach((w,j)=>{ const pct=Math.min(50,Math.abs(w)*100); s+=`<div class="barrow"><div class="mono">k${j}</div><div class="bar"><div class="fill" style="width:${pct}%; ${w<0?'left:auto;right:50%;':''}"></div></div><div class="mono small">${fmt(w)}</div></div>`; }); el.innerHTML=s;
+  }
+  function ocatBars(el, vec){
+    const labels=["h1-x","h1-y","h1-z","h2-x","h2-y","h2-z"]; let s="";
+    vec.forEach((v,i)=>{ const pct=Math.min(50,Math.abs(v)*35); s+=`<div class="barrow"><div class="mono">${labels[i]}</div><div class="bar ${i>=3?'red':''}"><div class="fill" style="width:${pct}%; ${v<0?'left:auto;right:50%;':''}"></div></div><div class="mono small">${fmt(v)}</div></div>`; });
+    el.innerHTML=s;
+  }
+  function selfTest(A1,A2,causal,O1,O2,V1,V2,Y,Ocat,WO){
+    [A1,A2].forEach((A,idx)=>{ const V=idx===0?V1:V2, O=idx===0?O1:O2;
+      A.forEach((r,i)=>{ const sum=r.reduce((a,b)=>a+b,0); if(Math.abs(sum-1)>1e-10) throw new Error(`A${idx+1} 第 ${i} 行和不为 1`); if(r.some(v=>v<-1e-12)) throw new Error(`A${idx+1} 出现负权重`);
+        if(causal && r.some((v,j)=>j>i && Math.abs(v)>1e-12)) throw new Error(`A${idx+1} causal 失效`);
+        const oi=Array.from({length:3},(_,k)=>r.reduce((s,w,j)=>s+w*V[j][k],0)); if(oi.some((v,k)=>Math.abs(v-O[i][k])>1e-10)) throw new Error(`O${idx+1}=A${idx+1}V${idx+1} 校验失败`);
+      });
+    });
+    const Y2=mul(Ocat,WO); for(let i=0;i<Y.length;i++) for(let j=0;j<Y[0].length;j++) if(Math.abs(Y[i][j]-Y2[i][j])>1e-10) throw new Error("Y = Ocat * WO 校验失败");
+  }
+  function renderHeadAV(){
+    if(!STATE) return;
+    const head=Number($("headView").value), i=Number($("qrow").value);
+    const A=head===1?STATE.A1:STATE.A2, V=head===1?STATE.V1:STATE.V2, O=head===1?STATE.O1:STATE.O2;
+    const a=A[i], result=O[i], scaled=V.map((v,j)=>vecScale(a[j],v));
+    $("sumLabel").innerHTML=`Head ${head}, o<sub>${i}</sub> = Σ<sub>j</sub> a<sub>${i}j</sub>v<sub>j</sub>`;
+    let partial=[], cur=[0,0,0]; for(let j=0;j<scaled.length;j++){ cur=vecAdd(cur,scaled[j]); partial.push([...cur]); }
+    $("partialSums").innerHTML=partial.map((s,idx)=>`<div class="line">s${idx+1} = ${scaled.slice(0,idx+1).map((_,j)=>`${fmt(a[j])}·v${j}`).join(" + ")} = [${s.map(fmt).join(", ")}]</div>`).join("");
+    const az=Number($("avAz").value), el=Number($("avEl").value), compRange=Math.max(1,...flatAbs([scaled,result]))*1.2;
+    draw3D($("plotScaledV"),[{points:scaled,prefix:"a·v",colors:COLORS,width:2.8},{points:[result],prefix:"o",color:RED,width:2.0,dashed:true}],compRange,az,el);
+    drawChain($("plotChain"),scaled,result,az,el);
+  }
+  function renderMergeBars(){ if(!STATE) return; const t=Number($("tokenMerge").value); ocatBars($("ocatBars"), STATE.Ocat[t]); }
+  function renderComparisonBars(){ if(!STATE) return; const i=Number($("qcmp").value); $("cmpBadge").textContent=`比较 q${i} 对所有 key 的注意力分配`; barRows($("barsA1"), STATE.A1[i]); barRows($("barsA2"), STATE.A2[i]); }
+  function renderAll(){
+    if(!STATE) return;
+    const az=Number($("az").value), el=Number($("el").value), r=STATE.range, ry=Math.max(r,STATE.yRange);
+    draw3D($("plotQ1"),[{points:STATE.Q1,prefix:"q",colors:COLORS}],r,az,el);
+    draw3D($("plotK1"),[{points:STATE.K1,prefix:"k",colors:COLORS}],r,az,el);
+    draw3D($("plotV1"),[{points:STATE.V1,prefix:"v",colors:COLORS}],r,az,el);
+    draw3D($("plotQ2"),[{points:STATE.Q2,prefix:"q",colors:COLORS}],r,az,el);
+    draw3D($("plotK2"),[{points:STATE.K2,prefix:"k",colors:COLORS}],r,az,el);
+    draw3D($("plotV2"),[{points:STATE.V2,prefix:"v",colors:COLORS}],r,az,el);
+    draw3D($("plotO1"),[{points:STATE.O1,prefix:"o",colors:COLORS}],r,az,el);
+    draw3D($("plotO2"),[{points:STATE.O2,prefix:"o",colors:COLORS}],r,az,el);
+    draw3D($("plotY"),[{points:STATE.Y,prefix:"y",colors:COLORS}],ry,az,el);
+    renderHeadAV(); renderComparisonBars(); renderMergeBars();
+  }
+  function update(){
+    const st=$("status");
+    try{
+      const X=readX(), WQ1=readMat("WQ1",3,3), WK1=readMat("WK1",3,3), WV1=readMat("WV1",3,3), WQ2=readMat("WQ2",3,3), WK2=readMat("WK2",3,3), WV2=readMat("WV2",3,3), WO=readMat("WO",6,3);
+      const causal=$("causal").checked;
+      const Q1=mul(X,WQ1), K1=mul(X,WK1), V1=mul(X,WV1), Q2=mul(X,WQ2), K2=mul(X,WK2), V2=mul(X,WV2);
+      const S1=scores(Q1,K1,causal), A1=S1.map(softmax), O1=weighted(A1,V1), S2=scores(Q2,K2,causal), A2=S2.map(softmax), O2=weighted(A2,V2);
+      const Ocat=concatCols(O1,O2), Y=mul(Ocat,WO);
+      selfTest(A1,A2,causal,O1,O2,V1,V2,Y,Ocat,WO);
+      const range=Math.max(1,...flatAbs([Q1,K1,V1,Q2,K2,V2,O1,O2]))*1.2, yRange=Math.max(1,...flatAbs(Y))*1.2;
+      STATE={X,Q1,K1,V1,Q2,K2,V2,S1,A1,O1,S2,A2,O2,Ocat,Y,range,yRange};
+      heatTable($("A1"), "Head 1：A^(1) = row-softmax(S1)", A1, "q", "k");
+      heatTable($("S1"), causal?"Head 1：S1 = Q1K1^T/√3 + causal mask":"Head 1：S1 = Q1K1^T/√3", S1, "q", "k");
+      heatTable($("A2"), "Head 2：A^(2) = row-softmax(S2)", A2, "q", "k");
+      heatTable($("S2"), causal?"Head 2：S2 = Q2K2^T/√3 + causal mask":"Head 2：S2 = Q2K2^T/√3", S2, "q", "k");
+      renderAll(); st.textContent="数学自检通过"; st.className="status ok";
+    }catch(e){ console.error(e); st.textContent=e.message; st.className="status bad"; }
+  }
+
+  buildInputs();
+  $("apply").addEventListener("click", applyPreset);
+  $("reset").addEventListener("click", reset);
+  $("update").addEventListener("click", update);
+  $("causal").addEventListener("change", update);
+  $("qcmp").addEventListener("change", renderComparisonBars);
+  $("headView").addEventListener("change", renderHeadAV);
+  $("qrow").addEventListener("change", renderHeadAV);
+  $("tokenMerge").addEventListener("change", renderMergeBars);
+  $("az").addEventListener("input", ()=>{$("azv").textContent=$("az").value+"°"; renderAll();});
+  $("el").addEventListener("input", ()=>{$("elv").textContent=$("el").value+"°"; renderAll();});
+  $("avAz").addEventListener("input", ()=>{$("avAzv").textContent=$("avAz").value+"°"; renderHeadAV();});
+  $("avEl").addEventListener("input", ()=>{$("avElv").textContent=$("avEl").value+"°"; renderHeadAV();});
+  window.addEventListener("resize", renderAll);
+  reset();
+})();
+</script>
+</body>
+</html>
